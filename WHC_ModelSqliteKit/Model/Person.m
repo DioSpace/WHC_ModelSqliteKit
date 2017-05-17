@@ -31,6 +31,10 @@
 
 @implementation Person
 
++ (NSString *)whc_SqliteTableName {
+    return @"persons";
+}
+
 + (NSArray *)whc_IgnorePropertys {
     return @[@"ignoreAttr1",
              @"ignoreAttr2",

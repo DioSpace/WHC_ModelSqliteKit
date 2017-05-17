@@ -40,6 +40,15 @@
  */
 + (NSString *)whc_SqliteVersion;
 
+/**
+ 自定义当前模型在数据库中的表名
+ 
+ 未实现时，默认为模型类名
+
+ @return 表名
+ */
++ (NSString *)whc_SqliteTableName;
+
 /// 自定义数据库加密密码
 /** 注意：
  ***该加密功能需要引用SQLCipher三方库才支持***
@@ -68,18 +77,26 @@
 @interface WHC_ModelSqlite : NSObject
 
 /**
+ 初始化
+
+ @param filePath 指定数据库文件绝对路径
+ @return 实例
+ */
+- (instancetype)initWithFilePath:(NSString *)filePath;
+
+/**
  * 说明: 存储模型数组到本地(事务方式)
  * @param model_array 模型数组对象(model_array 里对象类型要一致)
  */
 
-+ (BOOL)inserts:(NSArray *)model_array;
+- (BOOL)inserts:(NSArray *)model_array;
 
 /**
  * 说明: 存储模型到本地
  * @param model_object 模型对象
  */
 
-+ (BOOL)insert:(id)model_object;
+- (BOOL)insert:(id)model_object;
 
 
 /**
@@ -87,7 +104,7 @@
  * @param model_class 模型类
  * @return 总条数
  */
-+ (NSUInteger)count:(Class)model_class;
+- (NSUInteger)count:(Class)model_class;
 
 /**
  * 说明: 查询本地模型对象
@@ -95,7 +112,7 @@
  * @return 查询模型对象数组
  */
 
-+ (NSArray *)query:(Class)model_class;
+- (NSArray *)query:(Class)model_class;
 
 /**
  * 说明: 查询本地模型对象
@@ -104,7 +121,7 @@
  * @return 查询模型对象数组
  */
 
-+ (NSArray *)query:(Class)model_class where:(NSString *)where;
+- (NSArray *)query:(Class)model_class where:(NSString *)where;
 
 /**
  * 说明: 查询本地模型对象
@@ -116,7 +133,7 @@
 /// example: [WHCSqlite query:[Person class] order:@"by age desc/asc"];
 /// 对person数据表查询并且根据age自动降序或者升序排序
 
-+ (NSArray *)query:(Class)model_class order:(NSString *)order;
+- (NSArray *)query:(Class)model_class order:(NSString *)order;
 
 /**
  * 说明: 查询本地模型对象
@@ -130,7 +147,7 @@
 /// example: [WHCSqlite query:[Person class] limit:@"8 offset 8"];
 /// 对person数据表查询并且对查询列表偏移8并且限制查询数量为8
 
-+ (NSArray *)query:(Class)model_class limit:(NSString *)limit;
+- (NSArray *)query:(Class)model_class limit:(NSString *)limit;
 
 /**
  * 说明: 查询本地模型对象
@@ -143,7 +160,7 @@
 /// example: [WHCSqlite query:[Person class] where:@"age < 30" order:@"by age desc/asc"];
 /// 对person数据表查询age小于30岁并且根据age自动降序或者升序排序
 
-+ (NSArray *)query:(Class)model_class where:(NSString *)where order:(NSString *)order;
+- (NSArray *)query:(Class)model_class where:(NSString *)where order:(NSString *)order;
 
 /**
  * 说明: 查询本地模型对象
@@ -158,7 +175,7 @@
 /// example: [WHCSqlite query:[Person class] where:@"age <= 30" limit:@"8 offset 8"];
 /// 对person数据表查询age小于30岁并且对查询列表偏移8并且限制查询数量为8
 
-+ (NSArray *)query:(Class)model_class where:(NSString *)where limit:(NSString *)limit;
+- (NSArray *)query:(Class)model_class where:(NSString *)where limit:(NSString *)limit;
 
 /**
  * 说明: 查询本地模型对象
@@ -173,7 +190,7 @@
 /// example: [WHCSqlite query:[Person class] order:@"by age desc/asc" limit:@"8 offset 8"];
 /// 对person数据表查询并且根据age自动降序或者升序排序并且限制查询的数量为8偏移为8
 
-+ (NSArray *)query:(Class)model_class order:(NSString *)order limit:(NSString *)limit;
+- (NSArray *)query:(Class)model_class order:(NSString *)order limit:(NSString *)limit;
 
 /**
  * 说明: 查询本地模型对象
@@ -189,19 +206,19 @@
 /// example: [WHCSqlite query:[Person class] where:@"age <= 30" order:@"by age desc/asc" limit:@"8 offset 8"];
 /// 对person数据表查询age小于30岁并且根据age自动降序或者升序排序并且限制查询的数量为8偏移为8
 
-+ (NSArray *)query:(Class)model_class where:(NSString *)where order:(NSString *)order limit:(NSString *)limit;
+- (NSArray *)query:(Class)model_class where:(NSString *)where order:(NSString *)order limit:(NSString *)limit;
 
 
 /**
  说明: 自定义sql查询
-
+ 
  @param model_class 接收model类
  @param sql sql语句
  @return 查询模型对象数组
  
- /// example: [WHCSqlite query:Model.self sql:@"select cc.* from ( select tt.*,(select count(*)+1 from Chapter where chapter_id =tt.chapter_id and updateTime<tt.updateTime ) as group_id from Chapter tt) cc where cc.group_id<=7 order by updateTime desc"];
+ /// example: [WHCSqlite query:Model.self sql:@"select cc.* from ( select tt.*,(select count(*)-1 from Chapter where chapter_id =tt.chapter_id and updateTime<tt.updateTime ) as group_id from Chapter tt) cc where cc.group_id<=7 order by updateTime desc"];
  */
-+ (NSArray *)query:(Class)model_class sql:(NSString *)sql;
+- (NSArray *)query:(Class)model_class sql:(NSString *)sql;
 
 /**
  * 说明: 利用sqlite 函数进行查询
@@ -212,7 +229,7 @@
  * /// example: [WHCSqlite query:[Person class] sqliteFunc:@"max(age)"];  /// 获取Person表的最大age值
  * /// example: [WHCSqlite query:[Person class] sqliteFunc:@"count(*)"];  /// 获取Person表的总记录条数
  */
-+ (id)query:(Class)model_class func:(NSString *)func;
+- (id)query:(Class)model_class func:(NSString *)func;
 
 /**
  * 说明: 利用sqlite 函数进行查询
@@ -224,7 +241,7 @@
  * /// example: [WHCSqlite query:[Person class] sqliteFunc:@"max(age)" condition:@"where name = '北京'"];  /// 获取Person表name=北京集合中的的最大age值
  * /// example: [WHCSqlite query:[Person class] sqliteFunc:@"count(*)" condition:@"where name = '北京'"];  /// 获取Person表name=北京集合中的总记录条数
  */
-+ (id)query:(Class)model_class func:(NSString *)func condition:(NSString *)condition;
+- (id)query:(Class)model_class func:(NSString *)func condition:(NSString *)condition;
 
 /**
  * 说明: 更新本地模型对象
@@ -232,12 +249,12 @@
  * @param where 查询条件(查询语法和SQL where 查询语法一样，where为空则更新所有)
  */
 
-+ (BOOL)update:(id)model_object where:(NSString *)where;
+- (BOOL)update:(id)model_object where:(NSString *)where;
 
 
 /**
  说明: 更新数据表字段
-
+ 
  @param model_class 模型类
  @param value 更新的值
  @param where 更新条件
@@ -245,14 +262,14 @@
  /// 更新Person表在age字段大于25岁是的name值为whc，age为100岁
  /// example: [WHCSqlite update:Person.self value:@"name = 'whc', age = 100" where:@"age > 25"];
  */
-+ (BOOL)update:(Class)model_class value:(NSString *)value where:(NSString *)where;
+- (BOOL)update:(Class)model_class value:(NSString *)value where:(NSString *)where;
 
 /**
  * 说明: 清空本地模型对象
  * @param model_class 模型类
  */
 
-+ (BOOL)clear:(Class)model_class;
+- (BOOL)clear:(Class)model_class;
 
 
 /**
@@ -261,20 +278,20 @@
  * @param where 查询条件(查询语法和SQL where 查询语法一样，where为空则删除所有)
  */
 
-+ (BOOL)delete:(Class)model_class where:(NSString *)where;
+- (BOOL)delete:(Class)model_class where:(NSString *)where;
 
 /**
  * 说明: 清空所有本地模型数据库
  */
 
-+ (void)removeAllModel;
+//- (void)removeAllModel;
 
 /**
  * 说明: 清空指定本地模型数据库
  * @param model_class 模型类
  */
 
-+ (void)removeModel:(Class)model_class;
+- (void)removeModel:(Class)model_class;
 
 /**
  * 说明: 返回本地模型数据库路径
@@ -282,13 +299,13 @@
  * @return 路径
  */
 
-+ (NSString *)localPathWithModel:(Class)model_class;
+- (NSString *)localPathWithModel:(Class)model_class;
 
 /**
  * 说明: 返回本地模型数据库版本号
  * @param model_class 模型类
  * @return 版本号
  */
-+ (NSString *)versionWithModel:(Class)model_class;
+- (NSString *)versionWithModel:(Class)model_class;
 
 @end

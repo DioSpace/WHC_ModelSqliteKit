@@ -74,8 +74,6 @@ typedef enum : NSUInteger {
 } WHC_QueryType;
 
 
-static sqlite3 * _whc_database;
-
 @interface WHC_PropertyInfo : NSObject
 
 @property (nonatomic, assign, readonly) WHC_FieldType type;
@@ -101,36 +99,56 @@ static sqlite3 * _whc_database;
 
 @end
 
-@interface WHC_ModelSqlite ()
+@interface WHC_ModelSqlite () {
+    sqlite3 * _whc_database;
+}
+@property (nonatomic, copy) NSString *filePath;
 @property (nonatomic, strong) dispatch_semaphore_t dsema;
 @property (nonatomic, assign) BOOL check_update;
 @end
 
 @implementation WHC_ModelSqlite
 
-- (WHC_ModelSqlite *)init {
+- (instancetype)init {
     self = [super init];
     if (self) {
-        self.dsema = dispatch_semaphore_create(1);
-        self.check_update = YES;
+        [self _init];
     }
     return self;
 }
 
-+ (WHC_ModelSqlite *)shareInstance {
-    static WHC_ModelSqlite * instance = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        instance = [WHC_ModelSqlite new];
-    });
-    return instance;
+- (instancetype)initWithFilePath:(NSString *)filePath {
+    self = [super init];
+    if (self) {
+        [self _init];
+        self.filePath = filePath;
+    }
+    return self;
 }
 
-+ (NSString *)databaseCacheDirectory {
+- (void)_init {
+    self.filePath = nil;
+    self.dsema = dispatch_semaphore_create(1);
+    self.check_update = YES;
+}
+
+- (WHC_ModelSqlite *)shareInstance {
+    return self;
+}
+
+- (NSString *)databaseCacheDirectory {
     return [NSString stringWithFormat:@"%@/Library/Caches/WHCSqlite/",NSHomeDirectory()];
 }
 
-+ (WHC_FieldType)parserFieldTypeWithAttr:(NSString *)attr {
+- (NSString *)tableNameWithClass:(Class)model_class {
+    NSString *tableName = [self exceSelector:@selector(whc_SqliteTableName) modelClass:model_class];
+    if (!tableName || tableName.length <= 0) {
+        tableName = NSStringFromClass(model_class);
+    }
+    return tableName;
+}
+
+- (WHC_FieldType)parserFieldTypeWithAttr:(NSString *)attr {
     NSArray * sub_attrs = [attr componentsSeparatedByString:@","];
     NSString * first_sub_attr = sub_attrs.firstObject;
     first_sub_attr = [first_sub_attr substringFromIndex:1];
@@ -167,7 +185,7 @@ static sqlite3 * _whc_database;
     return field_type;
 }
 
-+ (const NSString *)databaseFieldTypeWithType:(WHC_FieldType)type {
+- (const NSString *)databaseFieldTypeWithType:(WHC_FieldType)type {
     switch (type) {
         case _String:
             return WHC_String;
@@ -197,11 +215,11 @@ static sqlite3 * _whc_database;
     return WHC_String;
 }
 
-+ (NSDictionary *)parserModelObjectFieldsWithModelClass:(Class)model_class {
+- (NSDictionary *)parserModelObjectFieldsWithModelClass:(Class)model_class {
     return [self parserSubModelObjectFieldsWithModelClass:model_class propertyName:nil complete:nil];
 }
 
-+ (NSDictionary *)parserSubModelObjectFieldsWithModelClass:(Class)model_class propertyName:(NSString *)main_property_name complete:(void(^)(NSString * key, WHC_PropertyInfo * property_object))complete {
+- (NSDictionary *)parserSubModelObjectFieldsWithModelClass:(Class)model_class propertyName:(NSString *)main_property_name complete:(void(^)(NSString * key, WHC_PropertyInfo * property_object))complete {
     BOOL need_dictionary_save = !main_property_name && !complete;
     NSMutableDictionary * fields = need_dictionary_save ? [NSMutableDictionary dictionary] : nil;
     Class super_class = class_getSuperclass(model_class);
@@ -284,7 +302,7 @@ static sqlite3 * _whc_database;
     return fields;
 }
 
-+ (BOOL)isSubModelWithClass:(Class)model_class {
+- (BOOL)isSubModelWithClass:(Class)model_class {
     return (model_class != [NSString class] &&
             model_class != [NSNumber class] &&
             model_class != [NSArray class] &&
@@ -303,7 +321,7 @@ static sqlite3 * _whc_database;
             model_class != [NSException class]);
 }
 
-+ (NSDictionary *)scanCommonSubModel:(id)model isClass:(BOOL)is_class {
+- (NSDictionary *)scanCommonSubModel:(id)model isClass:(BOOL)is_class {
     Class model_class = is_class ? model : [model class];
     NSMutableDictionary * sub_model_info = [NSMutableDictionary dictionary];
     Class super_class = class_getSuperclass(model_class);
@@ -338,18 +356,18 @@ static sqlite3 * _whc_database;
     return sub_model_info;
 }
 
-+ (NSDictionary * )scanSubModelClass:(Class)model_class {
+- (NSDictionary * )scanSubModelClass:(Class)model_class {
     return [self scanCommonSubModel:model_class isClass:YES];
 }
 
-+ (NSDictionary * )scanSubModelObject:(NSObject *)model_object {
+- (NSDictionary * )scanSubModelObject:(NSObject *)model_object {
     return [self scanCommonSubModel:model_object isClass:NO];
 }
 
-+ (sqlite_int64)getModelMaxIdWithClass:(Class)model_class {
+- (sqlite_int64)getModelMaxIdWithClass:(Class)model_class {
     sqlite_int64 max_id = 0;
     if (_whc_database) {
-        NSString * select_sql = [NSString stringWithFormat:@"SELECT MAX(%@) AS MAXVALUE FROM %@",[self getMainKeyWithClass:model_class],NSStringFromClass(model_class)];
+        NSString * select_sql = [NSString stringWithFormat:@"SELECT MAX(%@) AS MAXVALUE FROM %@",[self getMainKeyWithClass:model_class],[self tableNameWithClass:model_class]];
         sqlite3_stmt * pp_stmt = nil;
         if (sqlite3_prepare_v2(_whc_database, [select_sql UTF8String], -1, &pp_stmt, nil) == SQLITE_OK) {
             while (sqlite3_step(pp_stmt) == SQLITE_ROW) {
@@ -361,10 +379,10 @@ static sqlite3 * _whc_database;
     return max_id;
 }
 
-+ (NSArray *)getModelFieldNameWithClass:(Class)model_class {
+- (NSArray *)getModelFieldNameWithClass:(Class)model_class {
     NSMutableArray * field_name_array = [NSMutableArray array];
     if (_whc_database) {
-        NSString *sql = [NSString stringWithFormat:@"pragma table_info ('%@')",NSStringFromClass(model_class)];
+        NSString *sql = [NSString stringWithFormat:@"pragma table_info ('%@')",[self tableNameWithClass:model_class]];
         sqlite3_stmt *pp_stmt;
         if(sqlite3_prepare_v2(_whc_database, [sql UTF8String], -1, &pp_stmt, NULL) == SQLITE_OK){
             while(sqlite3_step(pp_stmt) == SQLITE_ROW) {
@@ -380,11 +398,11 @@ static sqlite3 * _whc_database;
     return field_name_array;
 }
 
-+ (void)updateTableFieldWithModel:(Class)model_class
+- (void)updateTableFieldWithModel:(Class)model_class
                        newVersion:(NSString *)newVersion
                    localModelName:(NSString *)local_model_name {
     @autoreleasepool {
-        NSString * table_name = NSStringFromClass(model_class);
+        NSString * table_name = [self tableNameWithClass:model_class];
         NSString * cache_directory = [self databaseCacheDirectory];
         NSString * database_cache_path = [NSString stringWithFormat:@"%@%@",cache_directory,local_model_name];
         if (sqlite3_open([database_cache_path UTF8String], &_whc_database) == SQLITE_OK) {
@@ -445,13 +463,13 @@ static sqlite3 * _whc_database;
     }
 }
 
-+ (BOOL)setKey:(NSString*)key {
+- (BOOL)setKey:(NSString*)key {
     NSData *keyData = [NSData dataWithBytes:[key UTF8String] length:(NSUInteger)strlen([key UTF8String])];
     
     return [self setKeyWithData:keyData];
 }
 
-+ (BOOL)setKeyWithData:(NSData *)keyData {
+- (BOOL)setKeyWithData:(NSData *)keyData {
 #ifdef SQLITE_HAS_CODEC
     if (!keyData) {
         return NO;
@@ -465,13 +483,13 @@ static sqlite3 * _whc_database;
 #endif
 }
 
-+ (BOOL)rekey:(NSString*)key {
+- (BOOL)rekey:(NSString*)key {
     NSData *keyData = [NSData dataWithBytes:(void *)[key UTF8String] length:(NSUInteger)strlen([key UTF8String])];
     
     return [self rekeyWithData:keyData];
 }
 
-+ (BOOL)rekeyWithData:(NSData *)keyData {
+- (BOOL)rekeyWithData:(NSData *)keyData {
 #ifdef SQLITE_HAS_CODEC
     if (!keyData) {
         return NO;
@@ -485,7 +503,7 @@ static sqlite3 * _whc_database;
 #endif
 }
 
-+ (NSString *)exceSelector:(SEL)selector modelClass:(Class)model_class {
+- (NSString *)exceSelector:(SEL)selector modelClass:(Class)model_class {
     if ([model_class respondsToSelector:selector]) {
         IMP sqlite_info_func = [model_class methodForSelector:selector];
         NSString * (*func)(id, SEL) = (void *)sqlite_info_func;
@@ -494,7 +512,7 @@ static sqlite3 * _whc_database;
     return nil;
 }
 
-+ (NSString *)getMainKeyWithClass:(Class)model_class {
+- (NSString *)getMainKeyWithClass:(Class)model_class {
     NSString * main_key = [self exceSelector:@selector(whc_SqliteMainkey) modelClass:model_class];
     if (!main_key || main_key.length == 0) {
         main_key = @"_id";
@@ -502,7 +520,7 @@ static sqlite3 * _whc_database;
     return main_key;
 }
 
-+ (NSString *)md5:(NSString *)psw {
+- (NSString *)md5:(NSString *)psw {
     if (psw && psw.length > 0) {
         NSMutableString * encrypt = [NSMutableString string];
         const char * cStr = psw.UTF8String;
@@ -517,7 +535,7 @@ static sqlite3 * _whc_database;
     return psw;
 }
 
-+ (NSString *)pswWithModel:(Class)model {
+- (NSString *)pswWithModel:(Class)model {
     NSString * psw = nil;
     if (model) {
         NSUserDefaults * ud = [NSUserDefaults standardUserDefaults];
@@ -528,7 +546,7 @@ static sqlite3 * _whc_database;
     return psw;
 }
 
-+ (void)saveModel:(Class)model psw:(NSString *)psw {
+- (void)saveModel:(Class)model psw:(NSString *)psw {
     if (model && psw && psw.length > 0) {
         dispatch_async(dispatch_get_global_queue(0, 0), ^{
             NSUserDefaults * ud = [NSUserDefaults standardUserDefaults];
@@ -540,7 +558,7 @@ static sqlite3 * _whc_database;
     }
 }
 
-+ (void)decryptionSqlite:(Class)model_class {
+- (void)decryptionSqlite:(Class)model_class {
 #ifdef SQLITE_HAS_CODEC
     NSString * psw_key = [self exceSelector:@selector(whc_SqlitePasswordKey) modelClass:model_class];
     if (psw_key && psw_key.length > 0) {
@@ -556,7 +574,7 @@ static sqlite3 * _whc_database;
 #endif
 }
 
-+ (BOOL)openTable:(Class)model_class {
+- (BOOL)openTable:(Class)model_class {
     NSFileManager * file_manager = [NSFileManager defaultManager];
     NSString * cache_directory = [self databaseCacheDirectory];
     BOOL is_directory = YES;
@@ -587,8 +605,8 @@ static sqlite3 * _whc_database;
     return NO;
 }
 
-+ (BOOL)createTable:(Class)model_class {
-    NSString * table_name = NSStringFromClass(model_class);
+- (BOOL)createTable:(Class)model_class {
+    NSString * table_name = [self tableNameWithClass:model_class];
     NSDictionary * field_dictionary = [self parserModelObjectFieldsWithModelClass:model_class];
     if (field_dictionary.count > 0) {
         NSString * main_key = [self getMainKeyWithClass:model_class];
@@ -624,7 +642,7 @@ static sqlite3 * _whc_database;
     return NO;
 }
 
-+ (BOOL)execSql:(NSString *)sql {
+- (BOOL)execSql:(NSString *)sql {
     BOOL result = sqlite3_exec(_whc_database, [sql UTF8String], nil, nil, nil) == SQLITE_OK;
     if (!result) {
         [self log:[NSString stringWithFormat:@"执行失败->%@", sql]];
@@ -632,10 +650,10 @@ static sqlite3 * _whc_database;
     return result;
 }
 
-+ (BOOL)commonInsert:(id)model_object {
+- (BOOL)commonInsert:(id)model_object {
     sqlite3_stmt * pp_stmt = nil;
     NSDictionary * field_dictionary = [self parserModelObjectFieldsWithModelClass:[model_object class]];
-    NSString * table_name = NSStringFromClass([model_object class]);
+    NSString * table_name = [self tableNameWithClass:[model_object class]];
     __block NSString * insert_sql = [NSString stringWithFormat:@"INSERT INTO %@ (",table_name];
     NSArray * field_array = field_dictionary.allKeys;
     NSMutableArray * value_array = [NSMutableArray array];
@@ -787,7 +805,7 @@ static sqlite3 * _whc_database;
     return YES;
 }
 
-+ (BOOL)inserts:(NSArray *)model_array {
+- (BOOL)inserts:(NSArray *)model_array {
     __block BOOL result = YES;
     dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
     @autoreleasepool {
@@ -808,14 +826,14 @@ static sqlite3 * _whc_database;
 }
 
 
-+ (BOOL)insert:(id)model_object {
+- (BOOL)insert:(id)model_object {
     if (model_object) {
         return [self inserts:@[model_object]];
     }
     return NO;
 }
 
-+ (id)autoNewSubmodelWithClass:(Class)model_class {
+- (id)autoNewSubmodelWithClass:(Class)model_class {
     if (model_class) {
         id model = model_class.new;
         unsigned int property_count = 0;
@@ -840,13 +858,13 @@ static sqlite3 * _whc_database;
     return nil;
 }
 
-+ (BOOL)isNumber:(NSString *)cahr {
+- (BOOL)isNumber:(NSString *)cahr {
     int value;
     NSScanner *scan = [NSScanner scannerWithString:cahr];
     return [scan scanInt:&value] && [scan isAtEnd];
 }
 
-+ (NSString *)handleWhere:(NSString *)where {
+- (NSString *)handleWhere:(NSString *)where {
     NSString * where_string = @"";
     if (where && where.length > 0) {
         NSArray * where_list = [where componentsSeparatedByString:@" "];
@@ -886,8 +904,8 @@ static sqlite3 * _whc_database;
     return where_string;
 }
 
-+ (NSArray *)commonQuery:(Class)model_class conditions:(NSArray *)conditions queryType:(WHC_QueryType)query_type {
-    NSString * table_name = NSStringFromClass(model_class);
+- (NSArray *)commonQuery:(Class)model_class conditions:(NSArray *)conditions queryType:(WHC_QueryType)query_type {
+    NSString * table_name = [self tableNameWithClass:model_class];
     NSString * select_sql = [NSString stringWithFormat:@"SELECT * FROM %@",table_name];
     NSString * where = nil;
     NSString * order = nil;
@@ -987,7 +1005,7 @@ static sqlite3 * _whc_database;
     return [self startSqlQuery:model_class sql:select_sql];
 }
 
-+ (NSArray *)startSqlQuery:(Class)model_class sql:(NSString *)sql {
+- (NSArray *)startSqlQuery:(Class)model_class sql:(NSString *)sql {
     NSDictionary * field_dictionary = [self parserModelObjectFieldsWithModelClass:model_class];
     NSMutableArray * model_object_array = [NSMutableArray array];
     sqlite3_stmt * pp_stmt = nil;
@@ -1103,14 +1121,14 @@ static sqlite3 * _whc_database;
 }
 
 
-+ (NSArray *)startQuery:(Class)model_class conditions:(NSArray *)conditions queryType:(WHC_QueryType)query_type {
+- (NSArray *)startQuery:(Class)model_class conditions:(NSArray *)conditions queryType:(WHC_QueryType)query_type {
     if (![self openTable:model_class]) return @[];
     NSArray * model_object_array = [self commonQuery:model_class conditions:conditions queryType:query_type];
     [self close];
     return model_object_array;
 }
 
-+ (NSArray *)queryModel:(Class)model_class conditions:(NSArray *)conditions queryType:(WHC_QueryType)query_type {
+- (NSArray *)queryModel:(Class)model_class conditions:(NSArray *)conditions queryType:(WHC_QueryType)query_type {
     if (![self localNameWithModel:model_class]) {return @[];}
     dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
     NSArray * model_array = [self startQuery:model_class conditions:conditions queryType:query_type];
@@ -1118,45 +1136,45 @@ static sqlite3 * _whc_database;
     return model_array;
 }
 
-+ (NSArray *)query:(Class)model_class {
+- (NSArray *)query:(Class)model_class {
     return [self query:model_class where:nil];
 }
 
-+ (NSArray *)query:(Class)model_class where:(NSString *)where {
+- (NSArray *)query:(Class)model_class where:(NSString *)where {
     return [self queryModel:model_class conditions:@[where == nil ? @"" : where] queryType:_Where];
 }
 
-+ (NSArray *)query:(Class)model_class order:(NSString *)order {
+- (NSArray *)query:(Class)model_class order:(NSString *)order {
     return [self queryModel:model_class conditions:@[order == nil ? @"" : order] queryType:_Order];
 }
 
 
-+ (NSArray *)query:(Class)model_class limit:(NSString *)limit {
+- (NSArray *)query:(Class)model_class limit:(NSString *)limit {
     return [self queryModel:model_class conditions:@[limit == nil ? @"" : limit] queryType:_Limit];
 }
 
-+ (NSArray *)query:(Class)model_class where:(NSString *)where order:(NSString *)order {
+- (NSArray *)query:(Class)model_class where:(NSString *)where order:(NSString *)order {
     return [self queryModel:model_class conditions:@[where == nil ? @"" : where,
                                                      order == nil ? @"" : order] queryType:_WhereOrder];
 }
 
-+ (NSArray *)query:(Class)model_class where:(NSString *)where limit:(NSString *)limit {
+- (NSArray *)query:(Class)model_class where:(NSString *)where limit:(NSString *)limit {
     return [self queryModel:model_class conditions:@[where == nil ? @"" : where,
                                                      limit == nil ? @"" : limit] queryType:_WhereLimit];
 }
 
-+ (NSArray *)query:(Class)model_class order:(NSString *)order limit:(NSString *)limit {
+- (NSArray *)query:(Class)model_class order:(NSString *)order limit:(NSString *)limit {
     return [self queryModel:model_class conditions:@[order == nil ? @"" : order,
                                                      limit == nil ? @"" : limit] queryType:_OrderLimit];
 }
 
-+ (NSArray *)query:(Class)model_class where:(NSString *)where order:(NSString *)order limit:(NSString *)limit {
+- (NSArray *)query:(Class)model_class where:(NSString *)where order:(NSString *)order limit:(NSString *)limit {
     return [self queryModel:model_class conditions:@[where == nil ? @"" : where,
                                                      order == nil ? @"" : order,
                                                      limit == nil ? @"" : limit] queryType:_WhereOrderLimit];
 }
 
-+ (NSArray *)query:(Class)model_class sql:(NSString *)sql {
+- (NSArray *)query:(Class)model_class sql:(NSString *)sql {
     if (sql && sql.length > 0) {
         if (![self localNameWithModel:model_class]) {return @[];}
         dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
@@ -1170,22 +1188,22 @@ static sqlite3 * _whc_database;
     return @[];
 }
 
-+ (NSUInteger)count:(Class)model_class {
+- (NSUInteger)count:(Class)model_class {
     NSNumber * count = [self query:model_class func:@"count(*)"];
     return count ? count.unsignedIntegerValue : 0;
 }
 
-+ (id)query:(Class)model_class func:(NSString *)func {
+- (id)query:(Class)model_class func:(NSString *)func {
     return [self query:model_class func:func condition:nil];
 }
 
-+ (id)query:(Class)model_class func:(NSString *)func condition:(NSString *)condition {
+- (id)query:(Class)model_class func:(NSString *)func condition:(NSString *)condition {
     if (![self localNameWithModel:model_class]) {return nil;}
     dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
     if (![self openTable:model_class]) return @[];
     NSMutableArray * result_array = [NSMutableArray array];
     @autoreleasepool {
-        NSString * table_name = NSStringFromClass(model_class);
+        NSString * table_name = [self tableNameWithClass:model_class];
         if (func == nil || func.length == 0) {
             [self log:@"发现错误 Sqlite Func 不能为空"];
             return nil;
@@ -1283,13 +1301,13 @@ static sqlite3 * _whc_database;
     return nil;
 }
 
-+ (BOOL)updateModel:(id)model_object where:(NSString *)where {
+- (BOOL)updateModel:(id)model_object where:(NSString *)where {
     if (model_object == nil) return NO;
     Class model_class = [model_object class];
     if (![self openTable:model_class]) return NO;
     sqlite3_stmt * pp_stmt = nil;
     NSDictionary * field_dictionary = [self parserModelObjectFieldsWithModelClass:model_class];
-    NSString * table_name = NSStringFromClass(model_class);
+    NSString * table_name = [self tableNameWithClass:model_class];
     __block NSString * update_sql = [NSString stringWithFormat:@"UPDATE %@ SET ",table_name];
     
     NSArray * field_array = field_dictionary.allKeys;
@@ -1410,7 +1428,7 @@ static sqlite3 * _whc_database;
     return YES;
 }
 
-+ (BOOL)update:(id)model_object where:(NSString *)where {
+- (BOOL)update:(id)model_object where:(NSString *)where {
     BOOL result = YES;
     if ([self localNameWithModel:[model_object class]]) {
         dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
@@ -1424,7 +1442,7 @@ static sqlite3 * _whc_database;
     return result;
 }
 
-+ (BOOL)update:(Class)model_class value:(NSString *)value where:(NSString *)where {
+- (BOOL)update:(Class)model_class value:(NSString *)value where:(NSString *)where {
     if (model_class == nil) return NO;
     BOOL result = YES;
     if ([self localNameWithModel:model_class]) {
@@ -1432,7 +1450,7 @@ static sqlite3 * _whc_database;
         @autoreleasepool {
             if (value != nil && value.length > 0) {
                 if ([self openTable:model_class]) {
-                    NSString * table_name = NSStringFromClass(model_class);
+                    NSString * table_name = [self tableNameWithClass:model_class];
                     NSString * update_sql = [NSString stringWithFormat:@"UPDATE %@ SET %@",table_name,value];
                     if (where != nil && where.length > 0) {
                         update_sql = [update_sql stringByAppendingFormat:@" WHERE %@", [self handleWhere:where]];
@@ -1453,15 +1471,15 @@ static sqlite3 * _whc_database;
     return result;
 }
 
-+ (BOOL)clear:(Class)model_class {
+- (BOOL)clear:(Class)model_class {
     return [self delete:model_class where:nil];
 }
 
-+ (BOOL)commonDeleteModel:(Class)model_class where:(NSString *)where {
+- (BOOL)commonDeleteModel:(Class)model_class where:(NSString *)where {
     BOOL result = YES;
     if ([self localNameWithModel:model_class]) {
         if ([self openTable:model_class]) {
-            NSString * table_name = NSStringFromClass(model_class);
+            NSString * table_name = [self tableNameWithClass:model_class];
             NSString * delete_sql = [NSString stringWithFormat:@"DELETE FROM %@",table_name];
             if (where != nil && where.length > 0) {
                 delete_sql = [delete_sql stringByAppendingFormat:@" WHERE %@",[self handleWhere:where]];
@@ -1477,7 +1495,7 @@ static sqlite3 * _whc_database;
     return result;
 }
 
-+ (BOOL)delete:(Class)model_class where:(NSString *)where {
+- (BOOL)delete:(Class)model_class where:(NSString *)where {
     BOOL result = YES;
     dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
     @autoreleasepool {
@@ -1487,34 +1505,34 @@ static sqlite3 * _whc_database;
     return result;
 }
 
-+ (void)close {
+- (void)close {
     if (_whc_database) {
         sqlite3_close(_whc_database);
         _whc_database = nil;
     }
 }
 
-+ (void)removeAllModel {
-    dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
-    @autoreleasepool {
-        NSFileManager * file_manager = [NSFileManager defaultManager];
-        NSString * cache_path = [self databaseCacheDirectory];
-        BOOL is_directory = YES;
-        if ([file_manager fileExistsAtPath:cache_path isDirectory:&is_directory]) {
-            NSArray * file_array = [file_manager contentsOfDirectoryAtPath:cache_path error:nil];
-            [file_array enumerateObjectsUsingBlock:^(id  _Nonnull file, NSUInteger idx, BOOL * _Nonnull stop) {
-                if (![file isEqualToString:@".DS_Store"]) {
-                    NSString * file_path = [NSString stringWithFormat:@"%@%@",cache_path,file];
-                    [file_manager removeItemAtPath:file_path error:nil];
-                    [self log:[NSString stringWithFormat:@"已经删除了数据库 ->%@",file_path]];
-                }
-            }];
-        }
-    }
-    dispatch_semaphore_signal([self shareInstance].dsema);
-}
+//- (void)removeAllModel {
+//    dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
+//    @autoreleasepool {
+//        NSFileManager * file_manager = [NSFileManager defaultManager];
+//        NSString * cache_path = [self databaseCacheDirectory];
+//        BOOL is_directory = YES;
+//        if ([file_manager fileExistsAtPath:cache_path isDirectory:&is_directory]) {
+//            NSArray * file_array = [file_manager contentsOfDirectoryAtPath:cache_path error:nil];
+//            [file_array enumerateObjectsUsingBlock:^(id  _Nonnull file, NSUInteger idx, BOOL * _Nonnull stop) {
+//                if (![file isEqualToString:@".DS_Store"]) {
+//                    NSString * file_path = [NSString stringWithFormat:@"%@%@",cache_path,file];
+//                    [file_manager removeItemAtPath:file_path error:nil];
+//                    [self log:[NSString stringWithFormat:@"已经删除了数据库 ->%@",file_path]];
+//                }
+//            }];
+//        }
+//    }
+//    dispatch_semaphore_signal([self shareInstance].dsema);
+//}
 
-+ (void)removeModel:(Class)model_class {
+- (void)removeModel:(Class)model_class {
     dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
     @autoreleasepool {
         NSFileManager * file_manager = [NSFileManager defaultManager];
@@ -1526,7 +1544,7 @@ static sqlite3 * _whc_database;
     dispatch_semaphore_signal([self shareInstance].dsema);
 }
 
-+ (NSString *)commonLocalPathWithModel:(Class)model_class isPath:(BOOL)isPath {
+- (NSString *)commonLocalPathWithModel:(Class)model_class isPath:(BOOL)isPath {
     NSString * class_name = NSStringFromClass(model_class);
     NSFileManager * file_manager = [NSFileManager defaultManager];
     NSString * file_directory = [self databaseCacheDirectory];
@@ -1550,15 +1568,15 @@ static sqlite3 * _whc_database;
     return file_path;
 }
 
-+ (NSString *)localNameWithModel:(Class)model_class {
+- (NSString *)localNameWithModel:(Class)model_class {
     return [self commonLocalPathWithModel:model_class isPath:NO];
 }
 
-+ (NSString *)localPathWithModel:(Class)model_class {
+- (NSString *)localPathWithModel:(Class)model_class {
     return [self commonLocalPathWithModel:model_class isPath:YES];
 }
 
-+ (NSString *)versionWithModel:(Class)model_class {
+- (NSString *)versionWithModel:(Class)model_class {
     NSString * model_version = nil;
     NSString * model_name = [self localNameWithModel:model_class];
     if (model_name) {
@@ -1572,7 +1590,7 @@ static sqlite3 * _whc_database;
     return model_version;
 }
 
-+ (void)log:(NSString *)msg {
+- (void)log:(NSString *)msg {
     NSLog(@"WHC_ModelSqlite:[%@]",msg);
 }
 
