@@ -101,8 +101,10 @@ typedef enum : NSUInteger {
 
 @interface WHC_ModelSqlite () {
     sqlite3 * _whc_database;
+    NSString *_filePath;
 }
-@property (nonatomic, copy) NSString *filePath;
+@property (nonatomic, copy) NSString *passwordKey;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *tableVersions;
 @property (nonatomic, strong) dispatch_semaphore_t dsema;
 @property (nonatomic, assign) BOOL check_update;
 @end
@@ -121,23 +123,35 @@ typedef enum : NSUInteger {
     self = [super init];
     if (self) {
         [self _init];
-        self.filePath = filePath;
+        _filePath = filePath;
     }
     return self;
 }
 
+- (instancetype)initWithFilePath:(NSString *)filePath passwordKey:(NSString *)passwordKey {
+    self = [super init];
+    if (self) {
+        [self _init];
+        _filePath = filePath;
+        self.passwordKey = passwordKey;
+    }
+    return self;
+}
+
+- (NSString *)filePath {
+    return _filePath;
+}
+
 - (void)_init {
-    self.filePath = nil;
+    _filePath = [NSString stringWithFormat:@"%@/Library/Caches/WHCSqlite/db.sqlite", NSHomeDirectory()];
+    self.passwordKey = nil;
+    self.tableVersions = [NSMutableDictionary dictionary];
     self.dsema = dispatch_semaphore_create(1);
     self.check_update = YES;
 }
 
 - (WHC_ModelSqlite *)shareInstance {
     return self;
-}
-
-- (NSString *)databaseCacheDirectory {
-    return [NSString stringWithFormat:@"%@/Library/Caches/WHCSqlite/",NSHomeDirectory()];
 }
 
 - (NSString *)tableNameWithClass:(Class)model_class {
@@ -398,67 +412,94 @@ typedef enum : NSUInteger {
     return field_name_array;
 }
 
-- (void)updateTableFieldWithModel:(Class)model_class
-                       newVersion:(NSString *)newVersion
-                   localModelName:(NSString *)local_model_name {
+- (void)checkIfUpdateTableWithModel:(Class)model_class {
+    SEL versionSEL = @selector(whc_SqliteVersion);
+    NSString * newVersion = @"1.0";
+    if ([model_class respondsToSelector:versionSEL]) {
+        newVersion = [self exceSelector:versionSEL modelClass:model_class];
+        if (!newVersion || newVersion.length == 0) {newVersion = @"1.0";}
+        NSString *tableName = [self tableNameWithClass:model_class];
+        
+        NSString *oldVersion = [self.tableVersions objectForKey:tableName];
+        BOOL exists = NO;
+        if (!oldVersion || oldVersion.length == 0) {
+            NSString *sql = @"CREATE TABLE IF NOT EXISTS WHC_TableVersions (tableName TEXT NOT NULL PRIMARY KEY, version TEXT NOT NULL)";
+            if (![self execSql:sql]) return;
+            
+            sql = [NSString stringWithFormat:@"SELECT version FROM WHC_TableVersions WHERE tableName='%@'", tableName];
+            sqlite3_stmt * pp_stmt = nil;
+            if (sqlite3_prepare_v2(_whc_database, [sql UTF8String], -1, &pp_stmt, nil) == SQLITE_OK) {
+                if (sqlite3_step(pp_stmt) == SQLITE_ROW) {
+                    exists = YES;
+                    const unsigned char * text = sqlite3_column_text(pp_stmt, 0);
+                    if (text != NULL) {
+                        oldVersion = [NSString stringWithCString:(const char *)text encoding:NSUTF8StringEncoding];
+                    }
+                }
+                sqlite3_finalize(pp_stmt);
+            }
+        }
+        
+        if (!oldVersion || ![newVersion isEqualToString:oldVersion]) {
+            NSString *sql;
+            if (exists) {
+                sql = [NSString stringWithFormat:@"UPDATE WHC_TableVersions SET version='%@' WHERE tableName='%@'", newVersion, tableName];
+            } else {
+                sql = [NSString stringWithFormat:@"INSERT INTO WHC_TableVersions (tableName, version) VALUES ('%@', '%@')", tableName, newVersion];
+            }
+            if (![self execSql:sql]) return;
+            
+            [self.tableVersions setObject:newVersion forKey:tableName];
+            
+            if (oldVersion) {
+                [self updateTableFieldWithModel:model_class newVersion:newVersion];
+            }
+        }
+    }
+}
+
+- (void)updateTableFieldWithModel:(Class)model_class newVersion:(NSString *)newVersion {
     @autoreleasepool {
         NSString * table_name = [self tableNameWithClass:model_class];
-        NSString * cache_directory = [self databaseCacheDirectory];
-        NSString * database_cache_path = [NSString stringWithFormat:@"%@%@",cache_directory,local_model_name];
-        if (sqlite3_open([database_cache_path UTF8String], &_whc_database) == SQLITE_OK) {
-            [self decryptionSqlite:model_class];
-            NSArray * old_model_field_name_array = [self getModelFieldNameWithClass:model_class];
-            NSDictionary * new_model_info = [self parserModelObjectFieldsWithModelClass:model_class];
-            NSMutableString * delete_field_names = [NSMutableString string];
-            NSMutableString * add_field_names = [NSMutableString string];
-            [old_model_field_name_array enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-                if (new_model_info[obj] == nil) {
-                    [delete_field_names appendString:obj];
-                    [delete_field_names appendString:@","];
+        NSArray * old_model_field_name_array = [self getModelFieldNameWithClass:model_class];
+        NSDictionary * new_model_info = [self parserModelObjectFieldsWithModelClass:model_class];
+        NSMutableString * delete_field_names = [NSMutableString string];
+        NSMutableString * add_field_names = [NSMutableString string];
+        [old_model_field_name_array enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+            if (new_model_info[obj] == nil) {
+                [delete_field_names appendString:obj];
+                [delete_field_names appendString:@","];
+            }
+        }];
+        [new_model_info enumerateKeysAndObjectsUsingBlock:^(id  _Nonnull key, WHC_PropertyInfo * obj, BOOL * _Nonnull stop) {
+            if (![old_model_field_name_array containsObject:key]) {
+                [add_field_names appendFormat:@"%@ %@,",key,[self databaseFieldTypeWithType:obj.type]];
+            }
+        }];
+        if (add_field_names.length > 0) {
+            NSArray * add_field_name_array = [add_field_names componentsSeparatedByString:@","];
+            [add_field_name_array enumerateObjectsUsingBlock:^(NSString * obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                if (obj.length > 0) {
+                    NSString * add_field_name_sql = [NSString stringWithFormat:@"ALTER TABLE %@ ADD %@",table_name,obj];
+                    [self execSql:add_field_name_sql];
                 }
             }];
-            [new_model_info enumerateKeysAndObjectsUsingBlock:^(id  _Nonnull key, WHC_PropertyInfo * obj, BOOL * _Nonnull stop) {
-                if (![old_model_field_name_array containsObject:key]) {
-                    [add_field_names appendFormat:@"%@ %@,",key,[self databaseFieldTypeWithType:obj.type]];
-                }
-            }];
-            if (add_field_names.length > 0) {
-                NSArray * add_field_name_array = [add_field_names componentsSeparatedByString:@","];
-                [add_field_name_array enumerateObjectsUsingBlock:^(NSString * obj, NSUInteger idx, BOOL * _Nonnull stop) {
-                    if (obj.length > 0) {
-                        NSString * add_field_name_sql = [NSString stringWithFormat:@"ALTER TABLE %@ ADD %@",table_name,obj];
-                        [self execSql:add_field_name_sql];
-                    }
-                }];
-            }
-            if (delete_field_names.length > 0) {
-                [delete_field_names deleteCharactersInRange:NSMakeRange(delete_field_names.length - 1, 1)];
-                NSString * default_key = [self getMainKeyWithClass:model_class];
-                if (![default_key isEqualToString:delete_field_names]) {
-                    [self shareInstance].check_update = NO;
-                    NSArray * old_model_data_array = [self commonQuery:model_class conditions:@[@""] queryType:_Where];
-                    [self close];
-                    NSFileManager * file_manager = [NSFileManager defaultManager];
-                    NSString * file_path = [self localPathWithModel:model_class];
-                    if (file_path) {
-                        [file_manager removeItemAtPath:file_path error:nil];
-                    }
-                    
-                    if ([self openTable:model_class]) {
-                        [self execSql:@"BEGIN TRANSACTION"];
-                        [old_model_data_array enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-                            [self commonInsert:obj];
-                        }];
-                        [self execSql:@"COMMIT"];
-                        [self close];
-                        return;
-                    }
+        }
+        if (delete_field_names.length > 0) {
+            [delete_field_names deleteCharactersInRange:NSMakeRange(delete_field_names.length - 1, 1)];
+            NSString * default_key = [self getMainKeyWithClass:model_class];
+            if (![default_key isEqualToString:delete_field_names]) {
+                NSArray * old_model_data_array = [self commonQuery:model_class conditions:@[@""] queryType:_Where];
+                [self execSql:[@"DROP TABLE " stringByAppendingString:table_name]];
+                
+                if ([self openTable:model_class]) {
+                    [self execSql:@"BEGIN TRANSACTION"];
+                    [old_model_data_array enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                        [self commonInsert:obj];
+                    }];
+                    [self execSql:@"COMMIT"];
                 }
             }
-            [self close];
-            NSString * new_database_cache_path = [NSString stringWithFormat:@"%@%@_v%@.sqlite",cache_directory,table_name,newVersion];
-            NSFileManager * file_manager = [NSFileManager defaultManager];
-            [file_manager moveItemAtPath:database_cache_path toPath:new_database_cache_path error:nil];
         }
     }
 }
@@ -535,74 +576,64 @@ typedef enum : NSUInteger {
     return psw;
 }
 
-- (NSString *)pswWithModel:(Class)model {
+- (NSString *)pswWithPath:(NSString *)path {
     NSString * psw = nil;
-    if (model) {
-        NSUserDefaults * ud = [NSUserDefaults standardUserDefaults];
-        NSString * model_name = NSStringFromClass(model);
-        NSData * psw_data = [ud objectForKey:[self md5:model_name]];
+    if (path) {
+        NSData * psw_data = [[NSUserDefaults standardUserDefaults] objectForKey:[self md5:path]];
         psw = [[NSString alloc] initWithData:psw_data encoding:NSUTF8StringEncoding];
     }
     return psw;
 }
 
-- (void)saveModel:(Class)model psw:(NSString *)psw {
-    if (model && psw && psw.length > 0) {
+- (void)savePath:(NSString *)path psw:(NSString *)psw {
+    if (path && psw && psw.length > 0) {
         dispatch_async(dispatch_get_global_queue(0, 0), ^{
             NSUserDefaults * ud = [NSUserDefaults standardUserDefaults];
-            NSString * model_name = NSStringFromClass(model);
             NSData * psw_data = [psw dataUsingEncoding:NSUTF8StringEncoding];
-            [ud setObject:psw_data forKey:[self md5:model_name]];
+            [ud setObject:psw_data forKey:[self md5:path]];
             [ud synchronize];
         });
     }
 }
 
-- (void)decryptionSqlite:(Class)model_class {
+- (void)decryptionSqlite {
 #ifdef SQLITE_HAS_CODEC
-    NSString * psw_key = [self exceSelector:@selector(whc_SqlitePasswordKey) modelClass:model_class];
+    NSString * psw_key = self.passwordKey;
     if (psw_key && psw_key.length > 0) {
-        NSString * old_psw = [self pswWithModel:model_class];
+        NSString * old_psw = [self pswWithPath:self.filePath];
         BOOL is_update_psw = (old_psw && ![old_psw isEqualToString:psw_key]);
         if (![self setKey:is_update_psw ? old_psw : psw_key]) {
             [self log:@"给数据库加密失败, 请引入SQLCipher库并配置SQLITE_HAS_CODEC或者pod 'WHC_ModelSqliteKit/SQLCipher'"];
         }else {
             if (is_update_psw) [self rekey:psw_key];
-            [self saveModel:model_class psw:psw_key];
+            [self savePath:self.filePath psw:psw_key];
         }
     }
 #endif
 }
 
 - (BOOL)openTable:(Class)model_class {
-    NSFileManager * file_manager = [NSFileManager defaultManager];
-    NSString * cache_directory = [self databaseCacheDirectory];
-    BOOL is_directory = YES;
-    if (![file_manager fileExistsAtPath:cache_directory isDirectory:&is_directory]) {
-        [file_manager createDirectoryAtPath:cache_directory withIntermediateDirectories:YES attributes:nil error:nil];
-    }
-    SEL VERSION = @selector(whc_SqliteVersion);
-    NSString * version = @"1.0";
-    if ([model_class respondsToSelector:VERSION]) {
-        version = [self exceSelector:VERSION modelClass:model_class];
-        if (!version || version.length == 0) {version = @"1.0";}
-        if ([self shareInstance].check_update) {
-            NSString * local_model_name = [self localNameWithModel:model_class];
-            if (local_model_name != nil &&
-                [local_model_name rangeOfString:version].location == NSNotFound) {
-                [self updateTableFieldWithModel:model_class
-                                     newVersion:version
-                                 localModelName:local_model_name];
-            }
+    if (!_whc_database) {
+        // 打开数据库
+        NSFileManager * file_manager = [NSFileManager defaultManager];
+        NSString * cache_directory = [self.filePath stringByDeletingLastPathComponent];
+        BOOL is_directory = YES;
+        if (![file_manager fileExistsAtPath:cache_directory isDirectory:&is_directory]) {
+            [file_manager createDirectoryAtPath:cache_directory withIntermediateDirectories:YES attributes:nil error:nil];
         }
-        [self shareInstance].check_update = YES;
+        if (sqlite3_open([self.filePath UTF8String], &_whc_database) == SQLITE_OK) {
+            [self decryptionSqlite];
+        }
     }
-    NSString * database_cache_path = [NSString stringWithFormat:@"%@%@_v%@.sqlite",cache_directory,NSStringFromClass(model_class),version];
-    if (sqlite3_open([database_cache_path UTF8String], &_whc_database) == SQLITE_OK) {
-        [self decryptionSqlite:model_class];
+    
+    if (_whc_database) {
+        // 数据表升级
+        [self checkIfUpdateTableWithModel:model_class];
+        // 创建表
         return [self createTable:model_class];
+    } else {
+        return NO;
     }
-    return NO;
 }
 
 - (BOOL)createTable:(Class)model_class {
@@ -1506,92 +1537,52 @@ typedef enum : NSUInteger {
 }
 
 - (void)close {
+    // 释放时才关闭数据
+//    if (_whc_database) {
+//        sqlite3_close(_whc_database);
+//        _whc_database = nil;
+//    }
+}
+
+- (void)dealloc {
     if (_whc_database) {
         sqlite3_close(_whc_database);
         _whc_database = nil;
     }
 }
 
-//- (void)removeAllModel {
-//    dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
-//    @autoreleasepool {
-//        NSFileManager * file_manager = [NSFileManager defaultManager];
-//        NSString * cache_path = [self databaseCacheDirectory];
-//        BOOL is_directory = YES;
-//        if ([file_manager fileExistsAtPath:cache_path isDirectory:&is_directory]) {
-//            NSArray * file_array = [file_manager contentsOfDirectoryAtPath:cache_path error:nil];
-//            [file_array enumerateObjectsUsingBlock:^(id  _Nonnull file, NSUInteger idx, BOOL * _Nonnull stop) {
-//                if (![file isEqualToString:@".DS_Store"]) {
-//                    NSString * file_path = [NSString stringWithFormat:@"%@%@",cache_path,file];
-//                    [file_manager removeItemAtPath:file_path error:nil];
-//                    [self log:[NSString stringWithFormat:@"已经删除了数据库 ->%@",file_path]];
-//                }
-//            }];
-//        }
-//    }
-//    dispatch_semaphore_signal([self shareInstance].dsema);
-//}
-
-- (void)removeModel:(Class)model_class {
+- (void)removeAllModel {
     dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
     @autoreleasepool {
+        if (_whc_database) {
+            sqlite3_close(_whc_database);
+            _whc_database = nil;
+        }
+        
         NSFileManager * file_manager = [NSFileManager defaultManager];
-        NSString * file_path = [self localPathWithModel:model_class];
-        if (file_path) {
-            [file_manager removeItemAtPath:file_path error:nil];
+        if ([file_manager fileExistsAtPath:_filePath]) {
+            [file_manager removeItemAtPath:_filePath error:nil];
+            [self log:[NSString stringWithFormat:@"已经删除了数据库 ->%@", _filePath]];
         }
     }
     dispatch_semaphore_signal([self shareInstance].dsema);
 }
 
-- (NSString *)commonLocalPathWithModel:(Class)model_class isPath:(BOOL)isPath {
-    NSString * class_name = NSStringFromClass(model_class);
-    NSFileManager * file_manager = [NSFileManager defaultManager];
-    NSString * file_directory = [self databaseCacheDirectory];
-    BOOL isDirectory = YES;
-    __block NSString * file_path = nil;
-    if ([file_manager fileExistsAtPath:file_directory isDirectory:&isDirectory]) {
-        NSArray <NSString *> * file_name_array = [file_manager contentsOfDirectoryAtPath:file_directory error:nil];
-        if (file_name_array != nil && file_name_array.count > 0) {
-            [file_name_array enumerateObjectsUsingBlock:^(NSString * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-                if ([obj rangeOfString:class_name].location != NSNotFound) {
-                    if (isPath) {
-                        file_path = [NSString stringWithFormat:@"%@%@",file_directory,obj];
-                    }else {
-                        file_path = [obj mutableCopy];
-                    }
-                    *stop = YES;
-                }
-            }];
-        }
-    }
-    return file_path;
+- (void)removeModel:(Class)model_class {
+    dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
+    NSString *table_name = [self tableNameWithClass:model_class];
+    [self execSql:[@"DROP TABLE " stringByAppendingString:table_name]];
+    dispatch_semaphore_signal([self shareInstance].dsema);
 }
 
 - (NSString *)localNameWithModel:(Class)model_class {
-    return [self commonLocalPathWithModel:model_class isPath:NO];
-}
-
-- (NSString *)localPathWithModel:(Class)model_class {
-    return [self commonLocalPathWithModel:model_class isPath:YES];
-}
-
-- (NSString *)versionWithModel:(Class)model_class {
-    NSString * model_version = nil;
-    NSString * model_name = [self localNameWithModel:model_class];
-    if (model_name) {
-        NSRange end_range = [model_name rangeOfString:@"." options:NSBackwardsSearch];
-        NSRange start_range = [model_name rangeOfString:@"v" options:NSBackwardsSearch];
-        if (end_range.location != NSNotFound &&
-            start_range.location != NSNotFound) {
-            model_version = [model_name substringWithRange:NSMakeRange(start_range.length + start_range.location, end_range.location - (start_range.length + start_range.location))];
-        }
-    }
-    return model_version;
+    return @"[self commonLocalPathWithModel:model_class isPath:NO]";
 }
 
 - (void)log:(NSString *)msg {
+#ifdef DEBUG
     NSLog(@"WHC_ModelSqlite:[%@]",msg);
+#endif
 }
 
 @end

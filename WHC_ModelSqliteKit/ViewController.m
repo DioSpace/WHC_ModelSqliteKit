@@ -44,7 +44,7 @@
     
     NSString *dbFilePath = [NSString stringWithFormat:@"%@/Library/Caches/DB/db.sqlite", NSHomeDirectory()];
     WHC_ModelSqlite *db = [[WHC_ModelSqlite alloc] initWithFilePath:dbFilePath];
-//    [db removeAllModel];
+    [db removeAllModel];
 //    [WHCSqlite removeAllModel];
     
     /// 1.存储模型对象到数据库演示代码
@@ -76,28 +76,32 @@
     /// 存储图片
     person.data = UIImagePNGRepresentation([UIImage imageNamed:@"image"]);
     
-    person.car = [Car new];
-    person.car.name = @"撼路者";
-    person.car.brand = @"大路虎";
+    Car *car = [Car new];
+    car.name = @"撼路者";
+    car.brand = @"大路虎";
+    [db insert:car];
     
-    person.school = [School new];
-    person.school.name = @"北京大学";
-    person.school.personCount = 5000;
-    person.school.city = [City new];
-    person.school.city.name = @"北京";
-    person.school.city.personCount = 1000;
+    School *school = [School new];
+    school.name = @"北京大学";
+    school.personCount = 5000;
+    school.city = [City new];
+    school.city.name = @"北京";
+    school.city.personCount = 1000;
+    [db insert:school];
 
     /// 线程安全测试
     
     dispatch_async(dispatch_get_global_queue(0, 0), ^{
-        person.name = @"武汉";
-        [db insert:person];
+        Person *person1 = [Person new];
+        person1.name = @"武汉";
+        [db insert:person1];
         NSLog(@"线程1.存储单个模型对象到数据库演示代码");
     });
     
     dispatch_async(dispatch_get_global_queue(0, 0), ^{
-        person.name = @"北京";
-        [db insert:person];
+        Person *person1 = [Person new];
+        person1.name = @"北京";
+        [db insert:person1];
         NSLog(@"线程2.存储单个模型对象到数据库演示代码");
     });
 
@@ -118,12 +122,11 @@
     
     NSArray * personss = [db query:[Person class]];
     
-    personss = [db query:Person.self sql:@"select * from Person"];
+    personss = [db query:Person.self sql:@"select * from persons"];
     
     /// 1.1查询上面存储的模型对象
         // where 参数为空查询所有, 查询语法和sql 语句一样
-    NSArray * personArray = [db query:[Person class]
-                                             where:@"name = '吴海超' and car.name = '宝马' or school.city.name = '北京'"];
+    NSArray * personArray = [db query:[Person class] where:@"type = 'android'"];
     [personArray enumerateObjectsUsingBlock:^(Person *  _Nonnull person, NSUInteger idx, BOOL * _Nonnull stop) {
         NSLog(@"第%lu条数据",(unsigned long)idx);
         NSLog(@"name = %@",person.name);
@@ -143,7 +146,7 @@
     NSLog(@"2.批量存储模型对象到数据库演示代码");
     
     /// 获取Person表字段name = 北京总记录数
-    sumCount = [db query:[Person class] func:@"count(*)" condition:@"where school.city.name = '北京--0'"];
+    sumCount = [db query:[School class] func:@"count(*)" condition:@"where city.name = '北京'"];
     NSLog(@"sumCount = %@",sumCount);
     
     /// 2.1 查询上面存储的模型对象演示代码
@@ -236,8 +239,10 @@
 //    [WHCSqlite removeAllModel];
     
     /// 8.1 获取数据库本地路径
-    NSString * path = [db localPathWithModel:[Person class]];
-    NSLog(@"localPath = %@",path);
+//    NSString * path = [db localPathWithModel:[Person class]];
+    NSLog(@"localPath = %@", db.filePath);
+    
+    db = nil;
     
 }
 
@@ -256,16 +261,16 @@
         
         person.data = UIImagePNGRepresentation([UIImage imageNamed:@"image"]);
         
-        person.car = [Car new];
-        person.car.name = [NSString stringWithFormat:@"撼路者--%d",i];
-        person.car.brand = [NSString stringWithFormat:@"大路虎--%d",i];
-        
-        person.school = [School new];
-        person.school.personCount = 5000 + i;
-        person.school.name = [NSString stringWithFormat:@"北京大学--%d",i];
-        person.school.city = [City new];
-        person.school.city.name = [NSString stringWithFormat:@"北京--%d",i];
-        person.school.city.personCount = 1000 + i;
+//        person.car = [Car new];
+//        person.car.name = [NSString stringWithFormat:@"撼路者--%d",i];
+//        person.car.brand = [NSString stringWithFormat:@"大路虎--%d",i];
+//        
+//        person.school = [School new];
+//        person.school.personCount = 5000 + i;
+//        person.school.name = [NSString stringWithFormat:@"北京大学--%d",i];
+//        person.school.city = [City new];
+//        person.school.city.name = [NSString stringWithFormat:@"北京--%d",i];
+//        person.school.city.personCount = 1000 + i;
         [personArray addObject:person];
     }
     return personArray;

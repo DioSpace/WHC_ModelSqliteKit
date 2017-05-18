@@ -43,20 +43,13 @@
 /**
  自定义当前模型在数据库中的表名
  
- 未实现时，默认为模型类名
+ 未实现时，默认为模型类名。
+ 
+ 非特殊情况不建议使用，因为人为自定义表名可能造成表重名
 
  @return 表名
  */
 + (NSString *)whc_SqliteTableName;
-
-/// 自定义数据库加密密码
-/** 注意：
- ***该加密功能需要引用SQLCipher三方库才支持***
- /// 引入方式有:
- *** 手动引入 ***
- *** pod 'WHC_ModelSqliteKit/SQLCipher' ***
- */
-+ (NSString *)whc_SqlitePasswordKey;
 
 /// 自定义数据表主键名称
 /**
@@ -76,6 +69,8 @@
 
 @interface WHC_ModelSqlite : NSObject
 
+@property (nonatomic, strong, readonly) NSString *filePath;
+
 /**
  初始化
 
@@ -83,6 +78,18 @@
  @return 实例
  */
 - (instancetype)initWithFilePath:(NSString *)filePath;
+
+/**
+ 初始化，可指定加密密码
+ 
+ 该加密功能需要引用SQLCipher三方库才支持
+ pod 'WHC_ModelSqliteKit/SQLCipher'
+ 
+ @param filePath 指定数据库文件绝对路径
+ @param passwordKey 自定义数据库加密密码
+ @return 实例
+ */
+- (instancetype)initWithFilePath:(NSString *)filePath passwordKey:(NSString *)passwordKey;
 
 /**
  * 说明: 存储模型数组到本地(事务方式)
@@ -281,31 +288,16 @@
 - (BOOL)delete:(Class)model_class where:(NSString *)where;
 
 /**
- * 说明: 清空所有本地模型数据库
+ * 说明: 清空数据库
  */
 
-//- (void)removeAllModel;
+- (void)removeAllModel;
 
 /**
- * 说明: 清空指定本地模型数据库
+ * 说明: 清空指定本地模型数据表
  * @param model_class 模型类
  */
 
 - (void)removeModel:(Class)model_class;
-
-/**
- * 说明: 返回本地模型数据库路径
- * @param model_class 模型类
- * @return 路径
- */
-
-- (NSString *)localPathWithModel:(Class)model_class;
-
-/**
- * 说明: 返回本地模型数据库版本号
- * @param model_class 模型类
- * @return 版本号
- */
-- (NSString *)versionWithModel:(Class)model_class;
 
 @end

@@ -45,8 +45,8 @@
 @property (nonatomic, strong) NSString * ww;
 @property (nonatomic, assign) char sex;
 @property (nonatomic, strong) NSString * type;
-@property (nonatomic, strong) Car * car;
-@property (nonatomic, strong) School * school;
+//@property (nonatomic, strong) Car * car;
+//@property (nonatomic, strong) School * school;
 @property (nonatomic, strong) NSNumber * zz;
 @property (nonatomic, strong) NSData * data;
 @property (nonatomic, strong) NSArray * array;
