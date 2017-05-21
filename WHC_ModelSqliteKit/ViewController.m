@@ -42,10 +42,11 @@
     [super viewDidLoad];
     _detailLabel.text = @"开发者:WHC(吴海超)\n\n专业的数据存储解决方案\n\n由于本开源库主要针对数据存储解决方案所以没有UI演示上面的图片是从sqlite里读取的\n\n测试者可以通过ViewController里测试用例进行断点查看\n\n觉得不错请给予star支持,你们的支持是对WHC最大的鼓励,谢谢";
     
+    NSTimeInterval startTime = [[NSDate new] timeIntervalSinceReferenceDate];
+    
     NSString *dbFilePath = [NSString stringWithFormat:@"%@/Library/Caches/DB/db.sqlite", NSHomeDirectory()];
     WHC_ModelSqlite *db = [[WHC_ModelSqlite alloc] initWithFilePath:dbFilePath];
     [db removeAllModel];
-//    [WHCSqlite removeAllModel];
     
     /// 1.存储模型对象到数据库演示代码
     Person * person = [Person new];
@@ -243,6 +244,10 @@
     NSLog(@"localPath = %@", db.filePath);
     
     db = nil;
+    
+    
+    NSTimeInterval endTime = [[NSDate new] timeIntervalSinceReferenceDate];
+    NSLog(@"耗时:%f", endTime - startTime);
     
 }
 

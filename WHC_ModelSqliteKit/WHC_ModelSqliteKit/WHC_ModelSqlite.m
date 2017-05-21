@@ -106,7 +106,6 @@ typedef enum : NSUInteger {
 @property (nonatomic, copy) NSString *passwordKey;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *tableVersions;
 @property (nonatomic, strong) dispatch_semaphore_t dsema;
-@property (nonatomic, assign) BOOL check_update;
 @end
 
 @implementation WHC_ModelSqlite
@@ -147,7 +146,6 @@ typedef enum : NSUInteger {
     self.passwordKey = nil;
     self.tableVersions = [NSMutableDictionary dictionary];
     self.dsema = dispatch_semaphore_create(1);
-    self.check_update = YES;
 }
 
 - (WHC_ModelSqlite *)shareInstance {
@@ -1537,14 +1535,6 @@ typedef enum : NSUInteger {
 }
 
 - (void)close {
-    // 释放时才关闭数据
-//    if (_whc_database) {
-//        sqlite3_close(_whc_database);
-//        _whc_database = nil;
-//    }
-}
-
-- (void)dealloc {
     if (_whc_database) {
         sqlite3_close(_whc_database);
         _whc_database = nil;
