@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		247086961ED13317001D0931 /* WHC_ModelSqliteKitTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 247086951ED13317001D0931 /* WHC_ModelSqliteKitTests.m */; };
+		247086A31ED13440001D0931 /* TestPerson.m in Sources */ = {isa = PBXBuildFile; fileRef = 247086A21ED13440001D0931 /* TestPerson.m */; };
+		249AB1391ED5196900321D77 /* TestSchool.m in Sources */ = {isa = PBXBuildFile; fileRef = 249AB1381ED5196900321D77 /* TestSchool.m */; };
+		249AB13C1ED51A5900321D77 /* TestNewPerson.m in Sources */ = {isa = PBXBuildFile; fileRef = 249AB13B1ED51A5900321D77 /* TestNewPerson.m */; };
+		249AB13E1ED5225200321D77 /* image@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 249AB13D1ED5225200321D77 /* image@2x.png */; };
 		84748AF71CF9FC4000139F82 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 84748AF61CF9FC4000139F82 /* main.m */; };
 		84748AFA1CF9FC4000139F82 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 84748AF91CF9FC4000139F82 /* AppDelegate.m */; };
 		84748AFD1CF9FC4000139F82 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 84748AFC1CF9FC4000139F82 /* ViewController.m */; };
@@ -24,7 +29,27 @@
 		FEFFE3341D1B9FC800DF0865 /* School.m in Sources */ = {isa = PBXBuildFile; fileRef = FEFFE3301D1B9FC800DF0865 /* School.m */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		247086981ED13317001D0931 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 84748AEA1CF9FC4000139F82 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 84748AF11CF9FC4000139F82;
+			remoteInfo = WHC_ModelSqliteKit;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		247086931ED13317001D0931 /* WHC_ModelSqliteKitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WHC_ModelSqliteKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		247086951ED13317001D0931 /* WHC_ModelSqliteKitTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WHC_ModelSqliteKitTests.m; sourceTree = "<group>"; };
+		247086971ED13317001D0931 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		247086A11ED13440001D0931 /* TestPerson.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestPerson.h; sourceTree = "<group>"; };
+		247086A21ED13440001D0931 /* TestPerson.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TestPerson.m; sourceTree = "<group>"; };
+		249AB1371ED5196900321D77 /* TestSchool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestSchool.h; sourceTree = "<group>"; };
+		249AB1381ED5196900321D77 /* TestSchool.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TestSchool.m; sourceTree = "<group>"; };
+		249AB13A1ED51A5900321D77 /* TestNewPerson.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestNewPerson.h; sourceTree = "<group>"; };
+		249AB13B1ED51A5900321D77 /* TestNewPerson.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TestNewPerson.m; sourceTree = "<group>"; };
+		249AB13D1ED5225200321D77 /* image@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "image@2x.png"; sourceTree = "<group>"; };
 		84748AF21CF9FC4000139F82 /* WHC_ModelSqliteKit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WHC_ModelSqliteKit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		84748AF61CF9FC4000139F82 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		84748AF81CF9FC4000139F82 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
@@ -54,6 +79,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		247086901ED13317001D0931 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		84748AEF1CF9FC4000139F82 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -65,12 +97,37 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		247086941ED13317001D0931 /* WHC_ModelSqliteKitTests */ = {
+			isa = PBXGroup;
+			children = (
+				249AB13D1ED5225200321D77 /* image@2x.png */,
+				247086A01ED13440001D0931 /* Model */,
+				247086951ED13317001D0931 /* WHC_ModelSqliteKitTests.m */,
+				247086971ED13317001D0931 /* Info.plist */,
+			);
+			path = WHC_ModelSqliteKitTests;
+			sourceTree = "<group>";
+		};
+		247086A01ED13440001D0931 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				247086A11ED13440001D0931 /* TestPerson.h */,
+				247086A21ED13440001D0931 /* TestPerson.m */,
+				249AB13A1ED51A5900321D77 /* TestNewPerson.h */,
+				249AB13B1ED51A5900321D77 /* TestNewPerson.m */,
+				249AB1371ED5196900321D77 /* TestSchool.h */,
+				249AB1381ED5196900321D77 /* TestSchool.m */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
 		84748AE91CF9FC4000139F82 = {
 			isa = PBXGroup;
 			children = (
 				84748B101CF9FD4C00139F82 /* libsqlite3.0.tbd */,
 				FE7635901E6AAC9600F09701 /* WHC_ModelKit */,
 				84748AF41CF9FC4000139F82 /* WHC_ModelSqliteKit */,
+				247086941ED13317001D0931 /* WHC_ModelSqliteKitTests */,
 				84748AF31CF9FC4000139F82 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -79,6 +136,7 @@
 			isa = PBXGroup;
 			children = (
 				84748AF21CF9FC4000139F82 /* WHC_ModelSqliteKit.app */,
+				247086931ED13317001D0931 /* WHC_ModelSqliteKitTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -148,6 +206,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		247086921ED13317001D0931 /* WHC_ModelSqliteKitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2470869C1ED13317001D0931 /* Build configuration list for PBXNativeTarget "WHC_ModelSqliteKitTests" */;
+			buildPhases = (
+				2470868F1ED13317001D0931 /* Sources */,
+				247086901ED13317001D0931 /* Frameworks */,
+				247086911ED13317001D0931 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				247086991ED13317001D0931 /* PBXTargetDependency */,
+			);
+			name = WHC_ModelSqliteKitTests;
+			productName = WHC_ModelSqliteKitTests;
+			productReference = 247086931ED13317001D0931 /* WHC_ModelSqliteKitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		84748AF11CF9FC4000139F82 /* WHC_ModelSqliteKit */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 84748B091CF9FC4000139F82 /* Build configuration list for PBXNativeTarget "WHC_ModelSqliteKit" */;
@@ -174,6 +250,12 @@
 				LastUpgradeCheck = 0730;
 				ORGANIZATIONNAME = WHC;
 				TargetAttributes = {
+					247086921ED13317001D0931 = {
+						CreatedOnToolsVersion = 8.2.1;
+						DevelopmentTeam = EZA33EQAV3;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 84748AF11CF9FC4000139F82;
+					};
 					84748AF11CF9FC4000139F82 = {
 						CreatedOnToolsVersion = 7.3.1;
 						DevelopmentTeam = 7F5YZXGNJ3;
@@ -194,11 +276,20 @@
 			projectRoot = "";
 			targets = (
 				84748AF11CF9FC4000139F82 /* WHC_ModelSqliteKit */,
+				247086921ED13317001D0931 /* WHC_ModelSqliteKitTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		247086911ED13317001D0931 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				249AB13E1ED5225200321D77 /* image@2x.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		84748AF01CF9FC4000139F82 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -213,6 +304,17 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		2470868F1ED13317001D0931 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				247086A31ED13440001D0931 /* TestPerson.m in Sources */,
+				249AB13C1ED51A5900321D77 /* TestNewPerson.m in Sources */,
+				247086961ED13317001D0931 /* WHC_ModelSqliteKitTests.m in Sources */,
+				249AB1391ED5196900321D77 /* TestSchool.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		84748AEE1CF9FC4000139F82 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -231,6 +333,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		247086991ED13317001D0931 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 84748AF11CF9FC4000139F82 /* WHC_ModelSqliteKit */;
+			targetProxy = 247086981ED13317001D0931 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		84748AFE1CF9FC4000139F82 /* Main.storyboard */ = {
@@ -252,6 +362,40 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		2470869A1ED13317001D0931 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				DEVELOPMENT_TEAM = EZA33EQAV3;
+				INFOPLIST_FILE = WHC_ModelSqliteKitTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.2;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kelei.WHC-ModelSqliteKitTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WHC_ModelSqliteKit.app/WHC_ModelSqliteKit";
+			};
+			name = Debug;
+		};
+		2470869B1ED13317001D0931 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				DEVELOPMENT_TEAM = EZA33EQAV3;
+				INFOPLIST_FILE = WHC_ModelSqliteKitTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.2;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kelei.WHC-ModelSqliteKitTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WHC_ModelSqliteKit.app/WHC_ModelSqliteKit";
+			};
+			name = Release;
+		};
 		84748B071CF9FC4000139F82 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -363,6 +507,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		2470869C1ED13317001D0931 /* Build configuration list for PBXNativeTarget "WHC_ModelSqliteKitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2470869A1ED13317001D0931 /* Debug */,
+				2470869B1ED13317001D0931 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		84748AED1CF9FC4000139F82 /* Build configuration list for PBXProject "WHC_ModelSqliteKit" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
