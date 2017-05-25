@@ -415,43 +415,45 @@ typedef enum : NSUInteger {
     NSString * newVersion = @"1.0";
     if ([model_class respondsToSelector:versionSEL]) {
         newVersion = [self exceSelector:versionSEL modelClass:model_class];
-        if (!newVersion || newVersion.length == 0) {newVersion = @"1.0";}
-        NSString *tableName = [self tableNameWithClass:model_class];
+    }
+    if (!newVersion || newVersion.length == 0) {newVersion = @"1.0";}
+    NSString *tableName = [self tableNameWithClass:model_class];
+    
+    NSString *oldVersion = [self.tableVersions objectForKey:tableName];
+    BOOL exists = NO;
+    if (oldVersion && oldVersion.length > 0) {
+        exists = YES;
+    } else {
+        NSString *sql = @"CREATE TABLE IF NOT EXISTS WHC_TableVersions (tableName TEXT NOT NULL PRIMARY KEY, version TEXT NOT NULL)";
+        if (![self execSql:sql]) return;
         
-        NSString *oldVersion = [self.tableVersions objectForKey:tableName];
-        BOOL exists = NO;
-        if (!oldVersion || oldVersion.length == 0) {
-            NSString *sql = @"CREATE TABLE IF NOT EXISTS WHC_TableVersions (tableName TEXT NOT NULL PRIMARY KEY, version TEXT NOT NULL)";
-            if (![self execSql:sql]) return;
-            
-            sql = [NSString stringWithFormat:@"SELECT version FROM WHC_TableVersions WHERE tableName='%@'", tableName];
-            sqlite3_stmt * pp_stmt = nil;
-            if (sqlite3_prepare_v2(_whc_database, [sql UTF8String], -1, &pp_stmt, nil) == SQLITE_OK) {
-                if (sqlite3_step(pp_stmt) == SQLITE_ROW) {
-                    exists = YES;
-                    const unsigned char * text = sqlite3_column_text(pp_stmt, 0);
-                    if (text != NULL) {
-                        oldVersion = [NSString stringWithCString:(const char *)text encoding:NSUTF8StringEncoding];
-                    }
+        sql = [NSString stringWithFormat:@"SELECT version FROM WHC_TableVersions WHERE tableName='%@'", tableName];
+        sqlite3_stmt * pp_stmt = nil;
+        if (sqlite3_prepare_v2(_whc_database, [sql UTF8String], -1, &pp_stmt, nil) == SQLITE_OK) {
+            if (sqlite3_step(pp_stmt) == SQLITE_ROW) {
+                exists = YES;
+                const unsigned char * text = sqlite3_column_text(pp_stmt, 0);
+                if (text != NULL) {
+                    oldVersion = [NSString stringWithCString:(const char *)text encoding:NSUTF8StringEncoding];
                 }
-                sqlite3_finalize(pp_stmt);
             }
+            sqlite3_finalize(pp_stmt);
         }
+    }
+    
+    if (!oldVersion || ![newVersion isEqualToString:oldVersion]) {
+        NSString *sql;
+        if (exists) {
+            sql = [NSString stringWithFormat:@"UPDATE WHC_TableVersions SET version='%@' WHERE tableName='%@'", newVersion, tableName];
+        } else {
+            sql = [NSString stringWithFormat:@"INSERT INTO WHC_TableVersions (tableName, version) VALUES ('%@', '%@')", tableName, newVersion];
+        }
+        if (![self execSql:sql]) return;
         
-        if (!oldVersion || ![newVersion isEqualToString:oldVersion]) {
-            NSString *sql;
-            if (exists) {
-                sql = [NSString stringWithFormat:@"UPDATE WHC_TableVersions SET version='%@' WHERE tableName='%@'", newVersion, tableName];
-            } else {
-                sql = [NSString stringWithFormat:@"INSERT INTO WHC_TableVersions (tableName, version) VALUES ('%@', '%@')", tableName, newVersion];
-            }
-            if (![self execSql:sql]) return;
-            
-            [self.tableVersions setObject:newVersion forKey:tableName];
-            
-            if (oldVersion) {
-                [self updateTableFieldWithModel:model_class newVersion:newVersion];
-            }
+        [self.tableVersions setObject:newVersion forKey:tableName];
+        
+        if (oldVersion) {
+            [self updateTableFieldWithModel:model_class newVersion:newVersion];
         }
     }
 }
@@ -491,11 +493,17 @@ typedef enum : NSUInteger {
                 [self execSql:[@"DROP TABLE " stringByAppendingString:table_name]];
                 
                 if ([self openTable:model_class]) {
+                    __block BOOL isSucc = YES;
                     [self execSql:@"BEGIN TRANSACTION"];
                     [old_model_data_array enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-                        [self commonInsert:obj];
+                        isSucc = [self commonInsert:obj];
+                        if (!isSucc) *stop = YES;
                     }];
-                    [self execSql:@"COMMIT"];
+                    if (isSucc) {
+                        [self execSql:@"COMMIT"];
+                    } else {
+                        [self execSql:@"ROLLBACK"];
+                    }
                 }
             }
         }
@@ -845,7 +853,11 @@ typedef enum : NSUInteger {
                     result = [self commonInsert:model];
                     if (!result) {*stop = YES;}
                 }];
-                [self execSql:@"COMMIT"];
+                if (result) {
+                    [self execSql:@"COMMIT"];
+                } else {
+                    [self execSql:@"ROLLBACK"];
+                }
                 [self close];
             }
         }
@@ -1544,10 +1556,7 @@ typedef enum : NSUInteger {
 - (void)removeAllModel {
     dispatch_semaphore_wait([self shareInstance].dsema, DISPATCH_TIME_FOREVER);
     @autoreleasepool {
-        if (_whc_database) {
-            sqlite3_close(_whc_database);
-            _whc_database = nil;
-        }
+        [self close];
         
         NSFileManager * file_manager = [NSFileManager defaultManager];
         if ([file_manager fileExistsAtPath:_filePath]) {
