@@ -1067,13 +1067,17 @@ typedef enum : NSUInteger {
         while (sqlite3_step(pp_stmt) == SQLITE_ROW) {
             id model_object = [self autoNewSubmodelWithClass:model_class];
             if (!model_object) {break;}
-            SEL whc_id_sel = NSSelectorFromString(@"setWhcId:");
-            if ([model_object respondsToSelector:whc_id_sel]) {
-                sqlite3_int64 value = sqlite3_column_int64(pp_stmt, 0);
-                ((void (*)(id, SEL, int64_t))(void *) objc_msgSend)((id)model_object, whc_id_sel, value);
-            }
-            for (int column = 1; column < colum_count; column++) {
+            NSString *mainKey = [self getMainKeyWithClass:model_class];
+            for (int column = 0; column < colum_count; column++) {
                 NSString * field_name = [NSString stringWithCString:sqlite3_column_name(pp_stmt, column) encoding:NSUTF8StringEncoding];
+                if ([field_name isEqualToString:mainKey]) {
+                    SEL whc_id_sel = NSSelectorFromString(@"setWhcId:");
+                    if ([model_object respondsToSelector:whc_id_sel]) {
+                        sqlite3_int64 value = sqlite3_column_int64(pp_stmt, column);
+                        ((void (*)(id, SEL, int64_t))(void *) objc_msgSend)((id)model_object, whc_id_sel, value);
+                    }
+                    continue;
+                }
                 WHC_PropertyInfo * property_info = field_dictionary[field_name];
                 if (property_info == nil) continue;
                 id current_model_object = model_object;
