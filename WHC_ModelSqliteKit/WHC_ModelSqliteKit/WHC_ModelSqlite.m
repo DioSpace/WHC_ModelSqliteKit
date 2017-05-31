@@ -420,30 +420,29 @@ typedef enum : NSUInteger {
     NSString *tableName = [self tableNameWithClass:model_class];
     
     NSString *oldVersion = [self.tableVersions objectForKey:tableName];
-    BOOL exists = NO;
+    BOOL oldVersionExists = NO;
     if (oldVersion && oldVersion.length > 0) {
-        exists = YES;
+        oldVersionExists = YES;
     } else {
         NSString *sql = @"CREATE TABLE IF NOT EXISTS WHC_TableVersions (tableName TEXT NOT NULL PRIMARY KEY, version TEXT NOT NULL)";
         if (![self execSql:sql]) return;
         
         sql = [NSString stringWithFormat:@"SELECT version FROM WHC_TableVersions WHERE tableName='%@'", tableName];
         sqlite3_stmt * pp_stmt = nil;
-        if (sqlite3_prepare_v2(_whc_database, [sql UTF8String], -1, &pp_stmt, nil) == SQLITE_OK) {
-            if (sqlite3_step(pp_stmt) == SQLITE_ROW) {
-                exists = YES;
-                const unsigned char * text = sqlite3_column_text(pp_stmt, 0);
-                if (text != NULL) {
-                    oldVersion = [NSString stringWithCString:(const char *)text encoding:NSUTF8StringEncoding];
-                }
+        if (sqlite3_prepare_v2(_whc_database, [sql UTF8String], -1, &pp_stmt, nil) == SQLITE_OK
+            && sqlite3_step(pp_stmt) == SQLITE_ROW) {
+            oldVersionExists = YES;
+            const unsigned char * text = sqlite3_column_text(pp_stmt, 0);
+            if (text != NULL) {
+                oldVersion = [NSString stringWithCString:(const char *)text encoding:NSUTF8StringEncoding];
             }
-            sqlite3_finalize(pp_stmt);
         }
+        sqlite3_finalize(pp_stmt);
     }
     
     if (!oldVersion || ![newVersion isEqualToString:oldVersion]) {
         NSString *sql;
-        if (exists) {
+        if (oldVersionExists) {
             sql = [NSString stringWithFormat:@"UPDATE WHC_TableVersions SET version='%@' WHERE tableName='%@'", newVersion, tableName];
         } else {
             sql = [NSString stringWithFormat:@"INSERT INTO WHC_TableVersions (tableName, version) VALUES ('%@', '%@')", tableName, newVersion];
@@ -452,10 +451,23 @@ typedef enum : NSUInteger {
         
         [self.tableVersions setObject:newVersion forKey:tableName];
         
-        if (oldVersion) {
+        if ([self isExistWithTableName:tableName]) {
             [self updateTableFieldWithModel:model_class newVersion:newVersion];
         }
     }
+}
+
+- (BOOL)isExistWithTableName:(NSString *)tableName {
+    BOOL isExist = NO;
+    NSString *sql = [NSString stringWithFormat:@"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='%@'", tableName];
+    sqlite3_stmt * pp_stmt = nil;
+    if (sqlite3_prepare_v2(_whc_database, [sql UTF8String], -1, &pp_stmt, nil) == SQLITE_OK
+        && sqlite3_step(pp_stmt) == SQLITE_ROW) {
+        sqlite3_int64 value = sqlite3_column_int64(pp_stmt, 0);
+        isExist = value > 0;
+    }
+    sqlite3_finalize(pp_stmt);
+    return isExist;
 }
 
 - (void)updateTableFieldWithModel:(Class)model_class newVersion:(NSString *)newVersion {
